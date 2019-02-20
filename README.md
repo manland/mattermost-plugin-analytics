@@ -1,14 +1,14 @@
 # Mattermost Plugin Analytics [![Build Status](https://travis-ci.com/manland/mattermost-plugin-analytics.svg?branch=master)](https://travis-ci.com/manland/mattermost-plugin-analytics)
 
-This plugin display analytics of your mattermost instance. When you enter `/analytics` it respond with :
+This plugin displays analytics for your Mattermost instance. When you enter `/analytics` it responds with :
 
 ![screenshot](screenshot.png)
 
 ## Install
 
-Download [latest release](https://github.com/manland/mattermost-plugin-analytics/releases) and upload it via the [System Console](https://about.mattermost.com/default-plugin-uploads).
+Download the [latest release](https://github.com/manland/mattermost-plugin-analytics/releases) and upload it via the [System Console](https://about.mattermost.com/default-plugin-uploads).
 
-## Develope
+## Develop
 
 ```
 make
