@@ -73,8 +73,8 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 	m := fmt.Sprintf("## Analytics since %s at %s\n", p.currentAnalytic.Start.Format("2 January"), p.currentAnalytic.Start.Format("15:04"))
 	p.currentAnalytic.RUnlock()
 	if data.totalMessagesPublic+data.totalMessagesPrivate > 0 {
-		m = m + fmt.Sprintf("#### **%d users** have send a total of **%d messages** in **%d channels**. With **%d** *(%d%%)* in public channels and **%d** *(%d%%)* in private.\n", len(data.users), data.totalMessagesPublic+data.totalMessagesPrivate, len(data.channels), data.totalMessagesPublic, (data.totalMessagesPublic*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.totalMessagesPrivate, (data.totalMessagesPrivate*100)/(data.totalMessagesPublic+data.totalMessagesPrivate))
-		m = m + fmt.Sprintf("#### And they have send a total of **%d files** for a total of **%s**.\n", p.currentAnalytic.FilesNb, byteCountDecimal(p.currentAnalytic.FilesSize))
+		m = m + fmt.Sprintf("#### **%d users** sent a total of **%d messages** in **%d channels**. With **%d** *(%d%%)* in public channels and **%d** *(%d%%)* in private.\n", len(data.users), data.totalMessagesPublic+data.totalMessagesPrivate, len(data.channels), data.totalMessagesPublic, (data.totalMessagesPublic*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.totalMessagesPrivate, (data.totalMessagesPrivate*100)/(data.totalMessagesPublic+data.totalMessagesPrivate))
+		m = m + fmt.Sprintf("#### And they sent a total of **%d files** for a total of **%s**.\n", p.currentAnalytic.FilesNb, byteCountDecimal(p.currentAnalytic.FilesSize))
 
 		m = m + "### :speak_no_evil: Podium Speaker Users\n"
 		if len(data.users) > 0 {
