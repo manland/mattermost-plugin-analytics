@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -41,33 +40,6 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 		return &model.CommandResponse{
 			ResponseType: model.COMMAND_RESPONSE_TYPE_EPHEMERAL,
 			Text:         fmt.Sprintf("Unknown command: " + args.Command),
-		}, nil
-	}
-
-	if strings.Contains(args.Command, "new") {
-		p.newSession()
-		allSessions, _ := p.allSessions()
-		j2, _ := json.Marshal(allSessions)
-		return &model.CommandResponse{
-			ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-			Text:         string(j2),
-		}, nil
-	}
-
-	if strings.Contains(args.Command, "session") {
-		allSessions, _ := p.allSessions()
-		j2, _ := json.Marshal(allSessions)
-		return &model.CommandResponse{
-			ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-			Text:         string(j2),
-		}, nil
-	}
-
-	if strings.Contains(args.Command, "raw") {
-		j2, _ := json.Marshal(p.currentAnalytic)
-		return &model.CommandResponse{
-			ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-			Text:         string(j2),
 		}, nil
 	}
 
@@ -181,7 +153,7 @@ func (p *Plugin) getChannelName(key string) (string, string, error) {
 		return "", "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
-		return "", "Private", nil
+		return "Private", "Private", nil
 	}
 	return channel.Name, channel.DisplayName, nil
 }

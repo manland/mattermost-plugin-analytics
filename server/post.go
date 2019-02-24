@@ -10,11 +10,11 @@ import (
 
 func (p *Plugin) startCron() error {
 	c := cron.New()
-	if err := c.AddFunc("@every 1m", func() {
-		p.API.LogError("SEND POST")
+	if err := c.AddFunc("@weekly", func() { // Run once a week, midnight between Sat/Sun
 		if err := p.sendAnalytics(); err != nil {
 			p.API.LogError("can't send post", "err", err.Error())
 		}
+		p.newSession()
 	}); err != nil {
 		return err
 	}
@@ -109,8 +109,7 @@ func (p *Plugin) buildAnalyticMsg() (string, error) {
 	urlLine.RawQuery = parametersURLLine.Encode()
 	line := "![](" + urlLine.String() + ") "
 
-	fmt.Println(pie + bar + line)
-	return m, nil
+	return m + pie + bar + line, nil
 }
 
 func (p *Plugin) sendAnalytics() error {
