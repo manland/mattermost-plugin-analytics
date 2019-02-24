@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -18,6 +20,31 @@ import (
 // If you add non-reference types to your configuration struct, be sure to rewrite Clone as a deep
 // copy appropriate for your types.
 type configuration struct {
+	Username      string
+	TeamsChannels string
+	BotUsername   string
+	BotIconURL    string
+}
+
+// IsValid validates if all the required fields are set.
+func (c *configuration) IsValid() error {
+	if c.Username == "" {
+		return errors.New("Need a Username to make posts as")
+	}
+	if c.TeamsChannels == "" {
+		return errors.New("Need TeamsChannels to post in")
+	}
+	if strings.Count(c.TeamsChannels, ",")+1 != strings.Count(c.TeamsChannels, "/") {
+		return errors.New("TeamsChannels must be in ofrm TeamName/ChannelName")
+	}
+	if c.BotUsername == "" {
+		return errors.New("Need BotUsername")
+	}
+	if c.BotIconURL == "" {
+		return errors.New("Need BotIconURL")
+	}
+
+	return nil
 }
 
 // Clone shallow copies the configuration. Your implementation may require a deep copy if
@@ -78,6 +105,36 @@ func (p *Plugin) OnConfigurationChange() error {
 	}
 
 	p.setConfiguration(configuration)
+
+	if err := configuration.IsValid(); err != nil {
+		return err
+	}
+
+	user, err := p.API.GetUserByUsername(configuration.Username)
+	if err != nil {
+		return fmt.Errorf("Unable to find user with configured username: %v", configuration.Username)
+	}
+	p.BotUserID = user.Id
+
+	channelsID := make([]string, 0)
+	for _, teamsChannels := range strings.Split(configuration.TeamsChannels, ",") {
+		v := strings.Split(teamsChannels, "/")
+		if len(v) != 2 {
+			return fmt.Errorf("Bad formatted TeamsChannels: %v", teamsChannels)
+		}
+		teamName := v[0]
+		channelName := v[1]
+		team, errC := p.API.GetTeamByName(teamName)
+		if errC != nil {
+			return fmt.Errorf("Unable to find team with configured team: %v", teamName)
+		}
+		channel, errC := p.API.GetChannelByName(team.Id, channelName, false)
+		if errC != nil {
+			return fmt.Errorf("Unable to find channel with configured channel: %v", channelName)
+		}
+		channelsID = append(channelsID, channel.Id)
+	}
+	p.ChannelsID = channelsID
 
 	return nil
 }

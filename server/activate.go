@@ -14,7 +14,7 @@ import (
 
 // OnActivate is called by mattermost when this plugin is started
 func (p *Plugin) OnActivate() error {
-	teams, err := p.API.GetTeams()
+	teams, err := p.API.GetTeamsForUser(p.BotUserID)
 	if err != nil {
 		return errors.Wrap(err, "failed to query teams OnActivate")
 	}
@@ -30,6 +30,9 @@ func (p *Plugin) OnActivate() error {
 	}
 	p.cronSavePoison = make(chan bool)
 	p.startCronSaver(p.cronSavePoison)
+	if err := p.startCron(); err != nil {
+		return err
+	}
 
 	return nil
 }
