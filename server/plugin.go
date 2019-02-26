@@ -56,8 +56,10 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 }
 
 type analyticsData struct {
+	id          string
 	displayName string
 	name        string
+	link        string
 	nb          int64
 	reply       int64
 }
@@ -77,10 +79,10 @@ func (p *Plugin) prepareData() (*preparedData, error) {
 	totalMessagesPrivate := int64(0)
 	users := make([]analyticsData, 0)
 	channels := make([]analyticsData, 0)
-	channels = append(channels, analyticsData{"Private", "Private", 0, 0})
+	channels = append(channels, analyticsData{id: "none", name: "Private", displayName: "Private", link: "", nb: 0, reply: 0})
 
 	for key, nb := range p.currentAnalytic.Channels {
-		channelName, channelDisplayName, err := p.getChannelName(key)
+		channelName, channelDisplayName, link, err := p.getChannelName(key)
 		if err != nil {
 			return nil, err
 		}
@@ -89,29 +91,29 @@ func (p *Plugin) prepareData() (*preparedData, error) {
 			channels[0].nb = channels[0].nb + nb
 		} else {
 			totalMessagesPublic += nb
-			channels = p.updateOrAppend(channels, analyticsData{channelDisplayName, channelName, nb, 0})
+			channels = p.updateOrAppend(channels, analyticsData{id: key, displayName: channelDisplayName, name: channelName, link: link, nb: nb, reply: 0})
 		}
 	}
 	for key, nb := range p.currentAnalytic.ChannelsReply {
-		channelName, channelDisplayName, err := p.getChannelName(key)
+		channelName, channelDisplayName, link, err := p.getChannelName(key)
 		if err != nil {
 			return nil, err
 		}
-		channels = p.updateOrAppend(channels, analyticsData{channelDisplayName, channelName, 0, nb})
+		channels = p.updateOrAppend(channels, analyticsData{id: key, displayName: channelDisplayName, name: channelName, link: link, nb: 0, reply: nb})
 	}
 	for key, nb := range p.currentAnalytic.Users {
 		displayKey, err := p.getUsername(key)
 		if err != nil {
 			return nil, err
 		}
-		users = p.updateOrAppend(users, analyticsData{displayKey, displayKey, nb, 0})
+		users = p.updateOrAppend(users, analyticsData{id: key, displayName: displayKey, name: displayKey, nb: nb, reply: 0})
 	}
 	for key, nb := range p.currentAnalytic.UsersReply {
 		displayKey, err := p.getUsername(key)
 		if err != nil {
 			return nil, err
 		}
-		users = p.updateOrAppend(users, analyticsData{displayKey, displayKey, 0, nb})
+		users = p.updateOrAppend(users, analyticsData{id: key, displayName: displayKey, name: displayKey, nb: 0, reply: nb})
 	}
 	sort.Slice(users, func(i, j int) bool {
 		return users[i].nb > users[j].nb
@@ -130,7 +132,7 @@ func (p *Plugin) prepareData() (*preparedData, error) {
 func (p *Plugin) updateOrAppend(originals []analyticsData, upsert analyticsData) []analyticsData {
 	var original analyticsData
 	for index, value := range originals {
-		if value.name == upsert.name {
+		if value.id == upsert.id {
 			original = value
 			originals = append(originals[:index], originals[index+1:]...)
 			break
@@ -147,21 +149,29 @@ func (p *Plugin) updateOrAppend(originals []analyticsData, upsert analyticsData)
 	return append(originals, upsert)
 }
 
-func (p *Plugin) getChannelName(key string) (string, string, error) {
+func (p *Plugin) getChannelName(key string) (string, string, string, error) {
 	channel, err := p.API.GetChannel(key)
 	if err != nil {
-		return "", "", errors.Wrap(err, "Can't retreive channel name")
+		return "", "", "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
-		return "Private", "Private", nil
+		return "", "Private", "", nil
 	}
-	return channel.Name, channel.DisplayName, nil
+	team, err := p.API.GetTeam(channel.TeamId)
+	if err != nil {
+		return "", "", "", &model.AppError{
+			Message:       "Can't retreive team name",
+			DetailedError: err.Error(),
+		}
+	}
+	config := p.API.GetConfig()
+	return channel.Name, team.DisplayName + "/" + channel.DisplayName, *config.ServiceSettings.SiteURL + "/" + team.Name + "/channels/" + channel.Name, nil
 }
 
 func (p *Plugin) getChannelDisplayName(key string) (string, error) {
 	channel, err := p.API.GetChannel(key)
 	if err != nil {
-		return "", errors.Wrap(err, "Can't retreive channel display name")
+		return "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
 		return "Private", nil

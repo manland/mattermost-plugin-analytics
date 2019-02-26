@@ -33,13 +33,13 @@ func (p *Plugin) buildAnalyticMsg() (string, error) {
 
 		m = m + "### :see_no_evil: Podium Channels Conversations\n"
 		if len(data.channels) > 0 {
-			m = m + fmt.Sprintf("* :1st_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[0].name, data.channels[0].nb, (data.channels[0].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[0].reply)
+			m = m + fmt.Sprintf("* :1st_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", channelLink(data.channels[0].displayName, data.channels[0].link), data.channels[0].nb, (data.channels[0].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[0].reply)
 		}
 		if len(data.channels) > 1 {
-			m = m + fmt.Sprintf("* :2nd_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[1].name, data.channels[1].nb, (data.channels[1].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[1].reply)
+			m = m + fmt.Sprintf("* :2nd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", channelLink(data.channels[1].displayName, data.channels[1].link), data.channels[1].nb, (data.channels[1].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[1].reply)
 		}
 		if len(data.channels) > 2 {
-			m = m + fmt.Sprintf("* :3rd_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[2].name, data.channels[2].nb, (data.channels[2].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[2].reply)
+			m = m + fmt.Sprintf("* :3rd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", channelLink(data.channels[2].displayName, data.channels[2].link), data.channels[2].nb, (data.channels[2].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[2].reply)
 		}
 	}
 
@@ -49,15 +49,18 @@ func (p *Plugin) buildAnalyticMsg() (string, error) {
 		parametersURLPie.Add(c.displayName, fmt.Sprintf("%d", c.nb))
 	}
 	urlPie.RawQuery = parametersURLPie.Encode()
-	pie := "![](" + urlPie.String() + ") "
+	pie := fmt.Sprintf("![channels pie chart](%s) ", urlPie.String())
 
 	urlBar, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/bar.svg")
 	parametersURLBar := url.Values{}
-	for _, c := range data.users {
+	for index, c := range data.users {
+		if index > 10 {
+			break
+		}
 		parametersURLBar.Add(c.displayName, fmt.Sprintf("%d", c.nb))
 	}
 	urlBar.RawQuery = parametersURLBar.Encode()
-	bar := "![](" + urlBar.String() + ") "
+	bar := fmt.Sprintf("![users bar chart](%s) ", urlBar.String())
 
 	allSessions, _ := p.allSessions()
 	urlLine, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/line.svg")
@@ -92,7 +95,7 @@ func (p *Plugin) buildAnalyticMsg() (string, error) {
 		parametersURLLine.Add("date", fmt.Sprintf("%d", session.Start.Unix()))
 	}
 	urlLine.RawQuery = parametersURLLine.Encode()
-	line := "![](" + urlLine.String() + ") "
+	line := fmt.Sprintf("![all sessions line chart](%s) ", urlLine.String())
 
 	return m + pie + bar + line, nil
 }
@@ -120,4 +123,11 @@ func (p *Plugin) sendAnalytics() error {
 	}
 
 	return nil
+}
+
+func channelLink(displayName string, link string) string {
+	if displayName != "Private" {
+		return fmt.Sprintf("[~%s](%s)", displayName, link)
+	}
+	return displayName
 }
