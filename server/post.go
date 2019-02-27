@@ -7,6 +7,11 @@ import (
 	"github.com/mattermost/mattermost-server/model"
 )
 
+const (
+	maxChannelsToDisplay = 10
+	maxUsersToDisplay    = 10
+)
+
 func (p *Plugin) buildAnalyticMsg() (string, error) {
 	data, err := p.prepareData()
 	if err != nil {
@@ -22,42 +27,48 @@ func (p *Plugin) buildAnalyticMsg() (string, error) {
 
 		m = m + "### :speak_no_evil: Podium Speaker Users\n"
 		if len(data.users) > 0 {
-			m = m + fmt.Sprintf("* :1st_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[0].name, data.users[0].nb, (data.users[0].nb*100)/data.totalMessagesPublic, data.users[0].reply)
+			m = m + fmt.Sprintf("* :1st_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[0].name, data.users[0].nb, getPercentComparingToPublicMessages(data, data.users[0]), data.users[0].reply)
 		}
 		if len(data.users) > 1 {
-			m = m + fmt.Sprintf("* :2nd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[1].name, data.users[1].nb, (data.users[1].nb*100)/data.totalMessagesPublic, data.users[1].reply)
+			m = m + fmt.Sprintf("* :2nd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[1].name, data.users[1].nb, getPercentComparingToPublicMessages(data, data.users[1]), data.users[1].reply)
 		}
 		if len(data.users) > 2 {
-			m = m + fmt.Sprintf("* :3rd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[2].name, data.users[2].nb, (data.users[2].nb*100)/data.totalMessagesPublic, data.users[2].reply)
+			m = m + fmt.Sprintf("* :3rd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[2].name, data.users[2].nb, getPercentComparingToPublicMessages(data, data.users[2]), data.users[2].reply)
 		}
 
 		m = m + "### :see_no_evil: Podium Channels Conversations\n"
 		if len(data.channels) > 0 {
-			m = m + fmt.Sprintf("* :1st_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[0].name, data.channels[0].nb, (data.channels[0].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[0].reply)
+			m = m + fmt.Sprintf("* :1st_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[0]), data.channels[0].nb, getPercentComparingToAllMessages(data, data.channels[0]), data.channels[0].reply)
 		}
 		if len(data.channels) > 1 {
-			m = m + fmt.Sprintf("* :2nd_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[1].name, data.channels[1].nb, (data.channels[1].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[1].reply)
+			m = m + fmt.Sprintf("* :2nd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[1]), data.channels[1].nb, getPercentComparingToAllMessages(data, data.channels[1]), data.channels[1].reply)
 		}
 		if len(data.channels) > 2 {
-			m = m + fmt.Sprintf("* :3rd_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[2].name, data.channels[2].nb, (data.channels[2].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[2].reply)
+			m = m + fmt.Sprintf("* :3rd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[2]), data.channels[2].nb, getPercentComparingToAllMessages(data, data.channels[2]), data.channels[2].reply)
 		}
 	}
 
 	urlPie, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
 	parametersURLPie := url.Values{}
-	for _, c := range data.channels {
+	for index, c := range data.channels {
+		if index > maxChannelsToDisplay {
+			break
+		}
 		parametersURLPie.Add(c.displayName, fmt.Sprintf("%d", c.nb))
 	}
 	urlPie.RawQuery = parametersURLPie.Encode()
-	pie := "![](" + urlPie.String() + ") "
+	pie := fmt.Sprintf("![channels pie chart](%s) ", urlPie.String())
 
 	urlBar, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/bar.svg")
 	parametersURLBar := url.Values{}
-	for _, c := range data.users {
+	for index, c := range data.users {
+		if index > maxUsersToDisplay {
+			break
+		}
 		parametersURLBar.Add(c.displayName, fmt.Sprintf("%d", c.nb))
 	}
 	urlBar.RawQuery = parametersURLBar.Encode()
-	bar := "![](" + urlBar.String() + ") "
+	bar := fmt.Sprintf("![users bar chart](%s) ", urlBar.String())
 
 	allSessions, _ := p.allSessions()
 	urlLine, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/line.svg")
@@ -92,7 +103,7 @@ func (p *Plugin) buildAnalyticMsg() (string, error) {
 		parametersURLLine.Add("date", fmt.Sprintf("%d", session.Start.Unix()))
 	}
 	urlLine.RawQuery = parametersURLLine.Encode()
-	line := "![](" + urlLine.String() + ") "
+	line := fmt.Sprintf("![all sessions line chart](%s) ", urlLine.String())
 
 	return m + pie + bar + line, nil
 }
@@ -120,4 +131,19 @@ func (p *Plugin) sendAnalytics() error {
 	}
 
 	return nil
+}
+
+func getChannelLink(data analyticsData) string {
+	if data.displayName != dmOrPrivateChannelName {
+		return fmt.Sprintf("[~%s](%s)", data.displayName, data.link)
+	}
+	return data.displayName
+}
+
+func getPercentComparingToPublicMessages(prepared *preparedData, data analyticsData) int64 {
+	return (data.nb * 100) / prepared.totalMessagesPublic
+}
+
+func getPercentComparingToAllMessages(prepared *preparedData, data analyticsData) int64 {
+	return (data.nb * 100) / (prepared.totalMessagesPublic + prepared.totalMessagesPrivate)
 }

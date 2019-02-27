@@ -204,7 +204,7 @@ func (p *Plugin) handleBar(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	graph := chart.BarChart{
-		Width:  300,
+		Width:  600,
 		Height: 300,
 		XAxis:  chart.StyleShow(),
 		YAxis: chart.YAxis{
