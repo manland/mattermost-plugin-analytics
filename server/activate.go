@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -148,6 +149,9 @@ func (p *Plugin) handlePie(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.ParseFloat(value[0], 64)
 		values = append(values, chart.Value{Value: v, Label: key})
 	}
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Label < values[j].Label
+	})
 	graph := chart.PieChart{
 		Width:  300,
 		Height: 300,
