@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	chart "github.com/wcharczuk/go-chart"
 )
 
+// OnActivate is called by mattermost when this plugin is started
 func (p *Plugin) OnActivate() error {
 	teams, err := p.API.GetTeams()
 	if err != nil {
@@ -32,9 +34,9 @@ func (p *Plugin) OnActivate() error {
 	return nil
 }
 
-func (p *Plugin) registerCommand(teamId string) error {
+func (p *Plugin) registerCommand(teamID string) error {
 	if err := p.API.RegisterCommand(&model.Command{
-		TeamId:           teamId,
+		TeamId:           teamID,
 		Trigger:          CommandTrigger,
 		AutoComplete:     true,
 		AutoCompleteDesc: "Display analytics of this channel",
@@ -47,6 +49,7 @@ func (p *Plugin) registerCommand(teamId string) error {
 	return nil
 }
 
+// OnDeactivate is called by mattermost when this plugin is deactivated
 func (p *Plugin) OnDeactivate() error {
 	teams, err := p.API.GetTeams()
 	if err != nil {
@@ -146,6 +149,9 @@ func (p *Plugin) handlePie(w http.ResponseWriter, r *http.Request) {
 		v, _ := strconv.ParseFloat(value[0], 64)
 		values = append(values, chart.Value{Value: v, Label: key})
 	}
+	sort.Slice(values, func(i, j int) bool {
+		return values[i].Label < values[j].Label
+	})
 	graph := chart.PieChart{
 		Width:  300,
 		Height: 300,

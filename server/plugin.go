@@ -10,8 +10,10 @@ import (
 
 	"github.com/mattermost/mattermost-server/model"
 	"github.com/mattermost/mattermost-server/plugin"
+	"github.com/pkg/errors"
 )
 
+// Plugin is the main struct used by mattermost to interact with this plugin
 type Plugin struct {
 	plugin.MattermostPlugin
 
@@ -27,8 +29,11 @@ type Plugin struct {
 	cronSavePoison chan bool
 }
 
+// CommandTrigger is the string used by user to interact with this plugin
 const CommandTrigger = "analytics"
 
+// ExecuteCommand will be called by mattermost when user use /analytics command
+// used to send a report
 func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*model.CommandResponse, *model.AppError) {
 	if !strings.HasPrefix(args.Command, "/"+CommandTrigger) {
 		return &model.CommandResponse{
@@ -66,7 +71,7 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 
 	data, err := p.prepareData()
 	if err != nil {
-		return nil, err
+		return nil, &model.AppError{Message: err.Error()}
 	}
 
 	p.currentAnalytic.RLock()
@@ -131,7 +136,7 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 		for key, value := range session.Channels {
 			displayKey, err := p.getChannelDisplayName(key)
 			if err != nil {
-				return nil, err
+				return nil, &model.AppError{Message: err.Error()}
 			}
 			allChannels[key] = true
 			parametersURLLine.Add(displayKey, fmt.Sprintf("%d", value))
@@ -139,7 +144,7 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 		for key := range allChannels {
 			displayKey, err := p.getChannelDisplayName(key)
 			if err != nil {
-				return nil, err
+				return nil, &model.AppError{Message: err.Error()}
 			}
 			if !allChannels[key] {
 				parametersURLLine.Add(displayKey, "0")
@@ -173,7 +178,7 @@ type preparedData struct {
 	channels             []analyticsData
 }
 
-func (p *Plugin) prepareData() (*preparedData, *model.AppError) {
+func (p *Plugin) prepareData() (*preparedData, error) {
 	p.currentAnalytic.RLock()
 	defer p.currentAnalytic.RUnlock()
 
@@ -251,13 +256,10 @@ func (p *Plugin) updateOrAppend(originals []analyticsData, upsert analyticsData)
 	return append(originals, upsert)
 }
 
-func (p *Plugin) getChannelName(key string) (string, string, *model.AppError) {
+func (p *Plugin) getChannelName(key string) (string, string, error) {
 	channel, err := p.API.GetChannel(key)
 	if err != nil {
-		return "", "", &model.AppError{
-			Message:       "Can't retreive channel name",
-			DetailedError: err.Error(),
-		}
+		return "", "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
 		return "", "Private", nil
@@ -265,13 +267,10 @@ func (p *Plugin) getChannelName(key string) (string, string, *model.AppError) {
 	return channel.Name, channel.DisplayName, nil
 }
 
-func (p *Plugin) getChannelDisplayName(key string) (string, *model.AppError) {
+func (p *Plugin) getChannelDisplayName(key string) (string, error) {
 	channel, err := p.API.GetChannel(key)
 	if err != nil {
-		return "", &model.AppError{
-			Message:       "Can't retreive channel display name",
-			DetailedError: err.Error(),
-		}
+		return "", errors.Wrap(err, "Can't retreive channel display name")
 	}
 	if channel.IsGroupOrDirect() {
 		return "Private", nil
@@ -279,13 +278,10 @@ func (p *Plugin) getChannelDisplayName(key string) (string, *model.AppError) {
 	return channel.DisplayName, nil
 }
 
-func (p *Plugin) getUsername(key string) (string, *model.AppError) {
+func (p *Plugin) getUsername(key string) (string, error) {
 	user, err := p.API.GetUser(key)
 	if err != nil {
-		return "", &model.AppError{
-			Message:       "Can't retreive user name",
-			DetailedError: err.Error(),
-		}
+		return "", errors.Wrap(err, "Can't retreive user name")
 	}
 	return user.Username, nil
 }
