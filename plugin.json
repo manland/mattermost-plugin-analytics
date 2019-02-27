@@ -3,6 +3,7 @@
     "name": "Analytics matter",
     "description": "This plugin give analytics of your mattermost instance to your users.",
     "version": "0.0.1",
+    "min_server_version": "5.6.0",
     "server": {
         "executables": {
             "linux-amd64": "server/dist/plugin-linux-amd64",
@@ -11,8 +12,32 @@
         }
     },
     "settings_schema": {
-        "header": "",
+        "header": "Analytics bot configuration",
         "footer": "",
-        "settings": []
+        "settings": [
+            {
+                "key": "Username",
+                "display_name": "User",
+                "type": "username",
+                "help_text": "Select the username of the user that the plugin will post with. This can be any user, the name and icon will be overridden when posting."
+            }, {
+                "key": "TeamsChannels",
+                "display_name": "Team/Channel",
+                "type": "text",
+                "placeholder": "myTeam1/channel1,myTeam2/channel2",
+                "help_text": "Enter the teams and channels where this plugin will post analytics every week."
+            }, {
+                "key": "BotUsername",
+                "display_name": "Bot username",
+                "type": "text",
+                "default": "Analytics",
+                "help_text": "Enter the name with the bot will post as."
+            }, {
+                "key": "BotIconURL",
+                "display_name": "Bot icon url",
+                "type": "text",
+                "help_text": "Enter the icon url with the bot will post as."
+            }
+        ]
     }
 }

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"net/url"
 	"sort"
 	"strings"
 	"sync"
@@ -26,7 +24,10 @@ type Plugin struct {
 
 	currentAnalytic *Analytic
 
-	cronSavePoison chan bool
+	cron *Cron
+
+	BotUserID  string
+	ChannelsID []string
 }
 
 // CommandTrigger is the string used by user to interact with this plugin
@@ -42,120 +43,10 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 		}, nil
 	}
 
-	if strings.Contains(args.Command, "new") {
-		p.newSession()
-		allSessions, _ := p.allSessions()
-		j2, _ := json.Marshal(allSessions)
-		return &model.CommandResponse{
-			ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-			Text:         string(j2),
-		}, nil
-	}
-
-	if strings.Contains(args.Command, "session") {
-		allSessions, _ := p.allSessions()
-		j2, _ := json.Marshal(allSessions)
-		return &model.CommandResponse{
-			ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-			Text:         string(j2),
-		}, nil
-	}
-
-	if strings.Contains(args.Command, "raw") {
-		j2, _ := json.Marshal(p.currentAnalytic)
-		return &model.CommandResponse{
-			ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-			Text:         string(j2),
-		}, nil
-	}
-
-	data, err := p.prepareData()
+	m, err := p.buildAnalyticMsg()
 	if err != nil {
 		return nil, &model.AppError{Message: err.Error()}
 	}
-
-	p.currentAnalytic.RLock()
-	m := fmt.Sprintf("## Analytics since %s at %s\n", p.currentAnalytic.Start.Format("2 January"), p.currentAnalytic.Start.Format("15:04"))
-	p.currentAnalytic.RUnlock()
-	if data.totalMessagesPublic+data.totalMessagesPrivate > 0 {
-		m = m + fmt.Sprintf("#### **%d users** sent a total of **%d messages** in **%d channels**. With **%d** *(%d%%)* in public channels and **%d** *(%d%%)* in private.\n", len(data.users), data.totalMessagesPublic+data.totalMessagesPrivate, len(data.channels), data.totalMessagesPublic, (data.totalMessagesPublic*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.totalMessagesPrivate, (data.totalMessagesPrivate*100)/(data.totalMessagesPublic+data.totalMessagesPrivate))
-		m = m + fmt.Sprintf("#### And they sent a total of **%d files** for a total of **%s**.\n", p.currentAnalytic.FilesNb, byteCountDecimal(p.currentAnalytic.FilesSize))
-
-		m = m + "### :speak_no_evil: Podium Speaker Users\n"
-		if len(data.users) > 0 {
-			m = m + fmt.Sprintf("* :1st_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[0].name, data.users[0].nb, (data.users[0].nb*100)/data.totalMessagesPublic, data.users[0].reply)
-		}
-		if len(data.users) > 1 {
-			m = m + fmt.Sprintf("* :2nd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[1].name, data.users[1].nb, (data.users[1].nb*100)/data.totalMessagesPublic, data.users[1].reply)
-		}
-		if len(data.users) > 2 {
-			m = m + fmt.Sprintf("* :3rd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[2].name, data.users[2].nb, (data.users[2].nb*100)/data.totalMessagesPublic, data.users[2].reply)
-		}
-
-		m = m + "### :see_no_evil: Podium Channels Conversations\n"
-		if len(data.channels) > 0 {
-			m = m + fmt.Sprintf("* :1st_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[0].name, data.channels[0].nb, (data.channels[0].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[0].reply)
-		}
-		if len(data.channels) > 1 {
-			m = m + fmt.Sprintf("* :2nd_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[1].name, data.channels[1].nb, (data.channels[1].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[1].reply)
-		}
-		if len(data.channels) > 2 {
-			m = m + fmt.Sprintf("* :3rd_place_medal: ~%s with a total of **%d** *(%d%%)* messages with %d reply\n", data.channels[2].name, data.channels[2].nb, (data.channels[2].nb*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.channels[2].reply)
-		}
-	}
-
-	urlPie, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
-	parametersURLPie := url.Values{}
-	for _, c := range data.channels {
-		parametersURLPie.Add(c.displayName, fmt.Sprintf("%d", c.nb))
-	}
-	urlPie.RawQuery = parametersURLPie.Encode()
-	pie := "![](" + urlPie.String() + ") "
-
-	urlBar, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/bar.svg")
-	parametersURLBar := url.Values{}
-	for _, c := range data.users {
-		parametersURLBar.Add(c.displayName, fmt.Sprintf("%d", c.nb))
-	}
-	urlBar.RawQuery = parametersURLBar.Encode()
-	bar := "![](" + urlBar.String() + ") "
-
-	allSessions, _ := p.allSessions()
-	urlLine, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/line.svg")
-	parametersURLLine := url.Values{}
-	allChannels := make(map[string]bool, 0)
-	for _, session := range allSessions {
-		for key := range session.Channels {
-			allChannels[key] = true
-		}
-	}
-	for _, session := range allSessions {
-		for key := range allChannels {
-			allChannels[key] = false //init with not found
-		}
-		for key, value := range session.Channels {
-			displayKey, err := p.getChannelDisplayName(key)
-			if err != nil {
-				return nil, &model.AppError{Message: err.Error()}
-			}
-			allChannels[key] = true
-			parametersURLLine.Add(displayKey, fmt.Sprintf("%d", value))
-		}
-		for key := range allChannels {
-			displayKey, err := p.getChannelDisplayName(key)
-			if err != nil {
-				return nil, &model.AppError{Message: err.Error()}
-			}
-			if !allChannels[key] {
-				parametersURLLine.Add(displayKey, "0")
-			}
-		}
-		parametersURLLine.Add("date", fmt.Sprintf("%d", session.Start.Unix()))
-	}
-	urlLine.RawQuery = parametersURLLine.Encode()
-	line := "![](" + urlLine.String() + ") "
-
-	m = m + pie + bar + line
 
 	return &model.CommandResponse{
 		ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
@@ -262,7 +153,7 @@ func (p *Plugin) getChannelName(key string) (string, string, error) {
 		return "", "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
-		return "", "Private", nil
+		return "Private", "Private", nil
 	}
 	return channel.Name, channel.DisplayName, nil
 }

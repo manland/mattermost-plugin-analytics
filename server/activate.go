@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -14,9 +15,9 @@ import (
 
 // OnActivate is called by mattermost when this plugin is started
 func (p *Plugin) OnActivate() error {
-	teams, err := p.API.GetTeams()
-	if err != nil {
-		return errors.Wrap(err, "failed to query teams OnActivate")
+	teams, errApp := p.API.GetTeamsForUser(p.BotUserID)
+	if errApp != nil {
+		return errors.Wrap(errApp, "failed to query teams OnActivate")
 	}
 
 	for _, team := range teams {
@@ -28,8 +29,12 @@ func (p *Plugin) OnActivate() error {
 	if err := p.retreiveData(); err != nil {
 		return err
 	}
-	p.cronSavePoison = make(chan bool)
-	p.startCronSaver(p.cronSavePoison)
+
+	c, err := NewCron(p)
+	if err != nil {
+		return err
+	}
+	p.cron = c
 
 	return nil
 }
@@ -62,15 +67,17 @@ func (p *Plugin) OnDeactivate() error {
 		}
 	}
 
-	p.cronSavePoison <- true
+	p.cron.Stop()
 
 	return nil
 }
 
+// ServeHTTP is called by mattermost when an http request is made to this plugin
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
+	var err error
 	switch r.URL.Path {
 	case "/line.svg":
-		p.handleLine(w, r)
+		err = p.handleLine(w, r)
 	case "/pie.svg":
 		p.handlePie(w, r)
 	case "/bar.svg":
@@ -78,9 +85,12 @@ func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Req
 	default:
 		http.NotFound(w, r)
 	}
+	if err != nil {
+		p.API.LogError("Error rendering chart", "err", err.Error())
+	}
 }
 
-func (p *Plugin) handleLine(w http.ResponseWriter, r *http.Request) {
+func (p *Plugin) handleLine(w http.ResponseWriter, r *http.Request) error {
 	times := make([]time.Time, 0)
 	yvalues := make(map[string][]float64, 0)
 	max := -1.0
@@ -96,7 +106,11 @@ func (p *Plugin) handleLine(w http.ResponseWriter, r *http.Request) {
 		} else {
 			yvalue := make([]float64, 0)
 			for _, value := range values {
-				v, _ := strconv.ParseFloat(value, 64)
+				v, err := strconv.ParseFloat(value, 64)
+				if err != nil {
+					p.API.LogError("can't parse value", "value", value, "url", r.URL.String())
+					v = 0
+				}
 				if v > max {
 					max = v
 				}
@@ -105,15 +119,30 @@ func (p *Plugin) handleLine(w http.ResponseWriter, r *http.Request) {
 			yvalues[key] = yvalue
 		}
 	}
+
+	if len(times) < 2 {
+		return fmt.Errorf("Not enought time to draw a chart %d for url %s", len(times), r.URL.String())
+	}
+
 	chartSeries := make([]chart.Series, 0)
 	for key, yvalue := range yvalues {
-		chartSeries = append(chartSeries,
-			chart.TimeSeries{
-				Name:    key,
-				XValues: times,
-				YValues: yvalue,
-			},
-		)
+		nbYValue := len(yvalue)
+		nbTimes := len(times)
+		if nbYValue == nbTimes {
+			chartSeries = append(chartSeries,
+				chart.TimeSeries{
+					Name:    key,
+					XValues: times,
+					YValues: yvalue,
+				},
+			)
+		} else {
+			p.API.LogDebug("Not enought data to draw line", "name", key, "nbTimes", nbTimes, "nbData", nbYValue, "url", r.URL.String())
+		}
+	}
+
+	if len(chartSeries) < 1 {
+		return fmt.Errorf("Not enought data to draw a chart %d for url %s", len(chartSeries), r.URL.String())
 	}
 
 	graph := chart.Chart{
@@ -134,10 +163,7 @@ func (p *Plugin) handleLine(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", chart.ContentTypeSVG)
-	err := graph.Render(chart.SVG, w)
-	if err != nil {
-		p.API.LogError("Error rendering line chart", "err", err.Error())
-	}
+	return graph.Render(chart.SVG, w)
 }
 
 func (p *Plugin) handlePie(w http.ResponseWriter, r *http.Request) {
@@ -175,7 +201,6 @@ func (p *Plugin) handleBar(w http.ResponseWriter, r *http.Request) {
 				max = v
 			}
 			values = append(values, chart.Value{Value: v, Label: key})
-			p.API.LogError("Error rendering pie chart", "value", v, "key", key)
 		}
 	}
 	graph := chart.BarChart{
