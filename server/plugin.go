@@ -11,6 +11,10 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	dmOrPrivateChannelName = "DM"
+)
+
 // Plugin is the main struct used by mattermost to interact with this plugin
 type Plugin struct {
 	plugin.MattermostPlugin
@@ -55,6 +59,8 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 
 }
 
+// analyticsData represent a line in the final report
+// it give for a channel (or a user) : displayName, name, link, number of posts and number of reply
 type analyticsData struct {
 	id          string
 	displayName string
@@ -79,14 +85,14 @@ func (p *Plugin) prepareData() (*preparedData, error) {
 	totalMessagesPrivate := int64(0)
 	users := make([]analyticsData, 0)
 	channels := make([]analyticsData, 0)
-	channels = append(channels, analyticsData{id: "none", name: "Private", displayName: "Private", link: "", nb: 0, reply: 0})
+	channels = append(channels, analyticsData{id: "none", name: dmOrPrivateChannelName, displayName: dmOrPrivateChannelName, link: "", nb: 0, reply: 0})
 
 	for key, nb := range p.currentAnalytic.Channels {
 		channelName, channelDisplayName, link, err := p.getChannelName(key)
 		if err != nil {
 			return nil, err
 		}
-		if channelName == "Private" {
+		if channelName == dmOrPrivateChannelName {
 			totalMessagesPrivate += nb
 			channels[0].nb = channels[0].nb + nb
 		} else {
@@ -149,13 +155,14 @@ func (p *Plugin) updateOrAppend(originals []analyticsData, upsert analyticsData)
 	return append(originals, upsert)
 }
 
+// getChannelName take a channel id and return name, displayName, link or error
 func (p *Plugin) getChannelName(key string) (string, string, string, error) {
 	channel, err := p.API.GetChannel(key)
 	if err != nil {
 		return "", "", "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
-		return "", "Private", "", nil
+		return dmOrPrivateChannelName, dmOrPrivateChannelName, "", nil
 	}
 	team, err := p.API.GetTeam(channel.TeamId)
 	if err != nil {
@@ -168,17 +175,19 @@ func (p *Plugin) getChannelName(key string) (string, string, string, error) {
 	return channel.Name, team.DisplayName + "/" + channel.DisplayName, *config.ServiceSettings.SiteURL + "/" + team.Name + "/channels/" + channel.Name, nil
 }
 
+// getChannelDisplayName take a channel id and return displayName or error
 func (p *Plugin) getChannelDisplayName(key string) (string, error) {
 	channel, err := p.API.GetChannel(key)
 	if err != nil {
 		return "", errors.Wrap(err, "Can't retreive channel name")
 	}
 	if channel.IsGroupOrDirect() {
-		return "Private", nil
+		return dmOrPrivateChannelName, nil
 	}
 	return channel.DisplayName, nil
 }
 
+// getUsername take a user id and return username or error
 func (p *Plugin) getUsername(key string) (string, error) {
 	user, err := p.API.GetUser(key)
 	if err != nil {
@@ -187,6 +196,7 @@ func (p *Plugin) getUsername(key string) (string, error) {
 	return user.Username, nil
 }
 
+// byteCountDecimal take an amount of bytes and return a humanized representation (e.g. 1M or 2G)
 func byteCountDecimal(b int64) string {
 	const unit = 1000
 	if b < unit {
