@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"time"
 
 	"github.com/pkg/errors"
 )
@@ -20,31 +19,18 @@ func (p *Plugin) retreiveData() error {
 	return nil
 }
 
-func (p *Plugin) startCronSaver(poison chan bool) {
-	go func() {
-		for {
-			select {
-			case <-time.After(1 + time.Minute):
-				p.saveCurrentAnalytic()
-			case <-poison:
-				p.saveCurrentAnalytic()
-				return
-			}
-		}
-	}()
-}
-
-func (p *Plugin) saveCurrentAnalytic() {
+func (p *Plugin) saveCurrentAnalytic() error {
 	p.currentAnalytic.RLock()
 	defer p.currentAnalytic.RUnlock()
 
 	j, err := json.Marshal(p.currentAnalytic)
 	if err != nil {
-		p.API.LogError("can't marshal internal analytics data")
+		return errors.Wrap(err, "can't marshal internal analytics data")
 	}
 	if err := p.API.KVSet("analytics", j); err != nil {
-		p.API.LogError("can't save analytics data")
+		return errors.Wrap(err, "can't save analytics data")
 	}
+	return nil
 }
 
 func (p *Plugin) allSessions() ([]*Analytic, error) {

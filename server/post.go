@@ -5,22 +5,7 @@ import (
 	"net/url"
 
 	"github.com/mattermost/mattermost-server/model"
-	"github.com/robfig/cron"
 )
-
-func (p *Plugin) startCron() error {
-	c := cron.New()
-	if err := c.AddFunc("@weekly", func() { // Run once a week, midnight between Sat/Sun
-		if err := p.sendAnalytics(); err != nil {
-			p.API.LogError("can't send post", "err", err.Error())
-		}
-		p.newSession()
-	}); err != nil {
-		return err
-	}
-	c.Start()
-	return nil
-}
 
 func (p *Plugin) buildAnalyticMsg() (string, error) {
 	data, err := p.prepareData()
@@ -122,7 +107,6 @@ func (p *Plugin) sendAnalytics() error {
 			UserId:    p.BotUserID,
 			ChannelId: channelID,
 			Message:   m,
-			Type:      "custom_git_welcome",
 			Props: map[string]interface{}{
 				"from_webhook":      "true",
 				"override_username": p.getConfiguration().BotUsername,

@@ -24,7 +24,7 @@ type Plugin struct {
 
 	currentAnalytic *Analytic
 
-	cronSavePoison chan bool
+	cron *Cron
 
 	BotUserID  string
 	ChannelsID []string

@@ -15,9 +15,9 @@ import (
 
 // OnActivate is called by mattermost when this plugin is started
 func (p *Plugin) OnActivate() error {
-	teams, err := p.API.GetTeamsForUser(p.BotUserID)
-	if err != nil {
-		return errors.Wrap(err, "failed to query teams OnActivate")
+	teams, errApp := p.API.GetTeamsForUser(p.BotUserID)
+	if errApp != nil {
+		return errors.Wrap(errApp, "failed to query teams OnActivate")
 	}
 
 	for _, team := range teams {
@@ -29,11 +29,12 @@ func (p *Plugin) OnActivate() error {
 	if err := p.retreiveData(); err != nil {
 		return err
 	}
-	p.cronSavePoison = make(chan bool)
-	p.startCronSaver(p.cronSavePoison)
-	if err := p.startCron(); err != nil {
+
+	c, err := NewCron(p)
+	if err != nil {
 		return err
 	}
+	p.cron = c
 
 	return nil
 }
@@ -66,11 +67,12 @@ func (p *Plugin) OnDeactivate() error {
 		}
 	}
 
-	p.cronSavePoison <- true
+	p.cron.Stop()
 
 	return nil
 }
 
+// ServeHTTP is called by mattermost when an http request is made to this plugin
 func (p *Plugin) ServeHTTP(c *plugin.Context, w http.ResponseWriter, r *http.Request) {
 	var err error
 	switch r.URL.Path {
