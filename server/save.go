@@ -25,18 +25,19 @@ func (p *Plugin) startCronSaver(poison chan bool) {
 		for {
 			select {
 			case <-time.After(1 + time.Minute):
-				p.save()
+				p.saveCurrentAnalytic()
 			case <-poison:
-				p.save()
+				p.saveCurrentAnalytic()
 				return
 			}
 		}
 	}()
 }
 
-func (p *Plugin) save() {
+func (p *Plugin) saveCurrentAnalytic() {
 	p.currentAnalytic.RLock()
 	defer p.currentAnalytic.RUnlock()
+
 	j, err := json.Marshal(p.currentAnalytic)
 	if err != nil {
 		p.API.LogError("can't marshal internal analytics data")
@@ -77,7 +78,7 @@ func (p *Plugin) newSession() {
 		p.API.LogWarn("can't marshal internal analytics data")
 	}
 	if err := p.API.KVSet("allAnalytics", j2); err != nil {
-		p.API.LogError("failed to unmarshal analytics from kv use new one", "err", err.Error())
+		p.API.LogError("failed to send allAnalytics to kv", "err", err.Error())
 	}
 	p.currentAnalytic.Init()
 }

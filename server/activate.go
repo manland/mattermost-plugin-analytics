@@ -11,6 +11,7 @@ import (
 	chart "github.com/wcharczuk/go-chart"
 )
 
+// OnActivate is called by mattermost when this plugin is started
 func (p *Plugin) OnActivate() error {
 	teams, err := p.API.GetTeams()
 	if err != nil {
@@ -32,9 +33,9 @@ func (p *Plugin) OnActivate() error {
 	return nil
 }
 
-func (p *Plugin) registerCommand(teamId string) error {
+func (p *Plugin) registerCommand(teamID string) error {
 	if err := p.API.RegisterCommand(&model.Command{
-		TeamId:           teamId,
+		TeamId:           teamID,
 		Trigger:          CommandTrigger,
 		AutoComplete:     true,
 		AutoCompleteDesc: "Display analytics of this channel",
@@ -47,6 +48,7 @@ func (p *Plugin) registerCommand(teamId string) error {
 	return nil
 }
 
+// OnDeactivate is called by mattermost when this plugin is deactivated
 func (p *Plugin) OnDeactivate() error {
 	teams, err := p.API.GetTeams()
 	if err != nil {
