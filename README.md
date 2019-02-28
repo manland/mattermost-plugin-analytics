@@ -4,11 +4,12 @@ This plugin displays analytics for your Mattermost instance. When you enter `/an
 
 ![screenshot](screenshot.png)
 
-## Install
+## Installation
 
-Download the [latest release](https://github.com/manland/mattermost-plugin-analytics/releases) and upload it via the [System Console](https://about.mattermost.com/default-plugin-uploads).
+1. Go to the [releases page of this GitHub repository](https://github.com/manland/mattermost-plugin-analytics/releases) and download the latest release for your Mattermost server.
+2. Upload this file in the Mattermost **System Console > Plugins > Management** page to install the plugin. To learn more about how to upload a plugin, [see the documentation](https://docs.mattermost.com/administration/plugins.html#plugin-uploads).
 
-## Develop
+## Development
 
 ```
 make
