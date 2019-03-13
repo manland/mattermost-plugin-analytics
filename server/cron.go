@@ -24,7 +24,7 @@ func NewCron(p *Plugin) (*Cron, error) {
 	}
 
 	if err := c.AddFunc("@weekly", func() { // Run once a week, midnight between Sat/Sun
-		if err := p.sendAnalytics(); err != nil {
+		if err := p.sendAnalytics(p.ChannelsID); err != nil {
 			p.API.LogError("can't send post", "err", err.Error())
 		}
 		p.newSession()
