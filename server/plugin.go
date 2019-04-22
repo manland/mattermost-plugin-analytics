@@ -43,20 +43,19 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 	if !strings.HasPrefix(args.Command, "/"+CommandTrigger) {
 		return &model.CommandResponse{
 			ResponseType: model.COMMAND_RESPONSE_TYPE_EPHEMERAL,
-			Text:         fmt.Sprintf("Unknown command: " + args.Command),
+			Text:         fmt.Sprintf("Unknown command: %s", args.Command),
 		}, nil
 	}
 
-	m, err := p.buildAnalyticMsg()
-	if err != nil {
-		return nil, &model.AppError{Message: err.Error()}
+	if err := p.sendAnalytics([]string{args.ChannelId}); err != nil {
+		p.API.LogError("can't send analytics", "err", err.Error())
+		return &model.CommandResponse{
+			ResponseType: model.COMMAND_RESPONSE_TYPE_EPHEMERAL,
+			Text:         fmt.Sprintf("An error occured!"),
+		}, nil
 	}
 
-	return &model.CommandResponse{
-		ResponseType: model.COMMAND_RESPONSE_TYPE_IN_CHANNEL,
-		Text:         m,
-	}, nil
-
+	return &model.CommandResponse{}, nil
 }
 
 // analyticsData represent a line in the final report
