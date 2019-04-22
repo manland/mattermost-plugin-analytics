@@ -1,7 +1,7 @@
 language: go
 
 go:
-  - 1.11.x
+  - 1.12.x
 
 install:
   - curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
@@ -22,7 +22,7 @@ deploy:
     secure: R5kTE7SmB3hoFQLhuvTYD+3w2h1Rad3bGSMpPDk22Pve8j7CZumApF0IFc0qIfbUOqBvqB1nhrcFjpMZtHSaWySbYMQYtVdzmkDFOo7ngv9dApHfjunL33S9MuxXFXy/4By+KZlEBNa1pdIcXFS034o9tzFCxny+do3xpD3xySElQNprhFlNuT678Oh2KnyaeZ5xd4JaAzojEIjaoQC1VBB002u8SAiqUGEEmiKZyvbcnt8DILWQuUVxHUi1AYcglydhZig1UBuXBf8Nyg4Sa6SpGuzep9ucQuEPPzpnKTAQUjASVNNJiCQHswDycqOyx53N+jCiTdBHslGrIEVzHeuHDqGyWlj50DgOtk0Gqq0kLiK3CHMMz6ANEY60PMtrSghvJQgNNYeYBkIdc2KzpNnLDp6yzklDwLdB3oiwtMSHIS9h+nnKqbvAzBzW52h266N022DBEVU78QayAa7Zv9SzCgMuKq2nVVdr8N9BFT5nGNhGvWaK8PDjGOhaw12YX6NOyqm+FGl8EsXEqhvmSzaPg9ZaEQgTveTMSwa6VdjUuEH+msktCvTC9MgcZ3I0x0lG1q1as29oRIwV9NsSwbgHS74UrNb8d/CWw8a6AR8bq/3F8lHVdTYlxerkjvTuMHtUJaL4fXrUb5q5iNbVjP6V6w0luJRnAzKsgW7H9ZY=
     skip_cleanup: true
     file_glob: true
-    file: dist/jira-*.tar.gz
+    file: dist/*.tar.gz
   on:
     repo: manland/mattermost-plugin-analytics
     tags: true
