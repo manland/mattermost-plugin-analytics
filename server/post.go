@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	"github.com/mattermost/mattermost-server/model"
+	"github.com/pkg/errors"
 )
 
 const (
@@ -13,6 +14,8 @@ const (
 )
 
 func (p *Plugin) buildAnalyticAttachments() ([]*model.SlackAttachment, error) {
+	siteURL := p.API.GetConfig().ServiceSettings.SiteURL
+
 	data, err := p.prepareData()
 	if err != nil {
 		return nil, err
@@ -26,8 +29,8 @@ func (p *Plugin) buildAnalyticAttachments() ([]*model.SlackAttachment, error) {
 		text += fmt.Sprintf("#### And they sent a total of **%d files** for a total of **%s**.\n", p.currentAnalytic.FilesNb, byteCountDecimal(p.currentAnalytic.FilesSize))
 	}
 
-	fields := append(getUsersFields(data), getChannelsFields(data)...)
-	sessions, err := p.getSessionsFields()
+	fields := append(getUsersFields(*siteURL, data), getChannelsFields(*siteURL, data)...)
+	sessions, err := p.getSessionsFields(*siteURL)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +49,7 @@ func (p *Plugin) buildAnalyticAttachments() ([]*model.SlackAttachment, error) {
 func (p *Plugin) sendAnalytics(ChannelsID []string) error {
 	attachments, err := p.buildAnalyticAttachments()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "can't build analytics attachments")
 	}
 	for _, channelID := range ChannelsID {
 		post := &model.Post{
@@ -61,14 +64,14 @@ func (p *Plugin) sendAnalytics(ChannelsID []string) error {
 		}
 
 		if _, err := p.API.CreatePost(post); err != nil {
-			return err
+			return errors.Wrap(err, "can't post mesage")
 		}
 	}
 
 	return nil
 }
 
-func getUsersFields(data *preparedData) []*model.SlackAttachmentField {
+func getUsersFields(siteURL string, data *preparedData) []*model.SlackAttachmentField {
 	m := "### Podium Speaker Users\n"
 	if len(data.users) > 0 {
 		m = m + fmt.Sprintf("* :1st_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[0].name, data.users[0].nb, getPercentComparingToPublicMessages(data, data.users[0]), data.users[0].reply)
@@ -79,7 +82,7 @@ func getUsersFields(data *preparedData) []*model.SlackAttachmentField {
 	if len(data.users) > 2 {
 		m = m + fmt.Sprintf("* :3rd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[2].name, data.users[2].nb, getPercentComparingToPublicMessages(data, data.users[2]), data.users[2].reply)
 	}
-	urlChart, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
+	urlChart, _ := url.Parse(siteURL + "/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
 	parametersURL := url.Values{}
 	for index, c := range data.users {
 		if index > maxUsersToDisplay {
@@ -88,22 +91,10 @@ func getUsersFields(data *preparedData) []*model.SlackAttachmentField {
 		parametersURL.Add(c.displayName, fmt.Sprintf("%d", c.nb))
 	}
 	urlChart.RawQuery = parametersURL.Encode()
-	return []*model.SlackAttachmentField{
-		{
-			Short: true,
-			Value: m,
-		},
-		{
-			Short: true,
-			// make a md array to have little border around image, working with all themes
-			Value: fmt.Sprintf(`| |
-|:-:|
-|![users pie chart](%s)|`, urlChart.String()),
-		},
-	}
+	return buildSlackAttachmentField(m, "users pie chart", urlChart)
 }
 
-func getChannelsFields(data *preparedData) []*model.SlackAttachmentField {
+func getChannelsFields(siteURL string, data *preparedData) []*model.SlackAttachmentField {
 	m := "### Podium Channels Conversations\n"
 	if len(data.channels) > 0 {
 		m = m + fmt.Sprintf("* :1st_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[0]), data.channels[0].nb, getPercentComparingToAllMessages(data, data.channels[0]), data.channels[0].reply)
@@ -114,7 +105,7 @@ func getChannelsFields(data *preparedData) []*model.SlackAttachmentField {
 	if len(data.channels) > 2 {
 		m = m + fmt.Sprintf("* :3rd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[2]), data.channels[2].nb, getPercentComparingToAllMessages(data, data.channels[2]), data.channels[2].reply)
 	}
-	urlChart, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
+	urlChart, _ := url.Parse(siteURL + "/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
 	parametersURL := url.Values{}
 	for index, c := range data.channels {
 		if index > maxChannelsToDisplay {
@@ -123,24 +114,12 @@ func getChannelsFields(data *preparedData) []*model.SlackAttachmentField {
 		parametersURL.Add(c.displayName, fmt.Sprintf("%d", c.nb))
 	}
 	urlChart.RawQuery = parametersURL.Encode()
-	return []*model.SlackAttachmentField{
-		{
-			Short: true,
-			Value: m,
-		},
-		{
-			Short: true,
-			// make a md array to have little border around image, working with all themes
-			Value: fmt.Sprintf(`| |
-|:-:|
-|![channels pie chart](%s)|`, urlChart.String()),
-		},
-	}
+	return buildSlackAttachmentField(m, "channels pie chart", urlChart)
 }
 
-func (p *Plugin) getSessionsFields() ([]*model.SlackAttachmentField, error) {
+func (p *Plugin) getSessionsFields(siteURL string) ([]*model.SlackAttachmentField, error) {
 	allSessions, _ := p.allSessions()
-	urlChart, _ := url.Parse("http://127.0.0.1:8065/plugins/com.github.manland.mattermost-plugin-analytics/line.svg")
+	urlChart, _ := url.Parse(siteURL + "/plugins/com.github.manland.mattermost-plugin-analytics/line.svg")
 	parametersURL := url.Values{}
 	allChannels := make(map[string]bool, 0)
 	for _, session := range allSessions {
@@ -172,16 +151,7 @@ func (p *Plugin) getSessionsFields() ([]*model.SlackAttachmentField, error) {
 		parametersURL.Add("date", fmt.Sprintf("%d", session.Start.Unix()))
 	}
 	urlChart.RawQuery = parametersURL.Encode()
-	return []*model.SlackAttachmentField{
-		{
-			Short: false,
-			// make a md array to have little border around image, working with all themes
-			Value: fmt.Sprintf(`### Historic
-| |
-|:-:|
-|![all sessions line chart](%s)|`, urlChart.String()),
-		},
-	}, nil
+	return buildSlackAttachmentField("", "all sessions line chart", urlChart), nil
 }
 
 func getChannelLink(data analyticsData) string {
@@ -197,4 +167,17 @@ func getPercentComparingToPublicMessages(prepared *preparedData, data analyticsD
 
 func getPercentComparingToAllMessages(prepared *preparedData, data analyticsData) int64 {
 	return (data.nb * 100) / (prepared.totalMessagesPublic + prepared.totalMessagesPrivate)
+}
+
+func buildSlackAttachmentField(description string, chartTitle string, chartURL *url.URL) []*model.SlackAttachmentField {
+	attachments := make([]*model.SlackAttachmentField, 0)
+	if description != "" {
+		attachments = append(attachments, &model.SlackAttachmentField{Short: true, Value: description})
+	}
+	return append(attachments, &model.SlackAttachmentField{
+		Short: true,
+		// make a md array to have little border around image, working with all themes
+		Value: fmt.Sprintf("| |\n|:-:|\n|![%s](%s)|", chartTitle, chartURL.String()),
+	},
+	)
 }

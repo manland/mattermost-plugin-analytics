@@ -48,9 +48,10 @@ func (p *Plugin) ExecuteCommand(c *plugin.Context, args *model.CommandArgs) (*mo
 	}
 
 	if err := p.sendAnalytics([]string{args.ChannelId}); err != nil {
+		p.API.LogError("can't send analytics", "err", err.Error())
 		return &model.CommandResponse{
 			ResponseType: model.COMMAND_RESPONSE_TYPE_EPHEMERAL,
-			Text:         fmt.Sprintf("Error: %s", err.Error()),
+			Text:         fmt.Sprintf("An error occured!"),
 		}, nil
 	}
 
