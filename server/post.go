@@ -22,11 +22,11 @@ func (p *Plugin) buildAnalyticAttachments() ([]*model.SlackAttachment, error) {
 	}
 
 	p.currentAnalytic.RLock()
-	text := fmt.Sprintf("## Analytics since %s at %s\n", p.currentAnalytic.Start.Format("2 January"), p.currentAnalytic.Start.Format("15:04"))
+	text := fmt.Sprintf("## Analytics since %s, at %s.\n", p.currentAnalytic.Start.Format("January 2, 2006"), p.currentAnalytic.Start.Format("15:04"))
 	p.currentAnalytic.RUnlock()
 	if data.totalMessagesPublic+data.totalMessagesPrivate > 0 {
-		text += fmt.Sprintf("#### **%d users** sent a total of **%d messages** in **%d channels**. With **%d** *(%d%%)* in public channels and **%d** *(%d%%)* in private.\n", len(data.users), data.totalMessagesPublic+data.totalMessagesPrivate, len(data.channels), data.totalMessagesPublic, (data.totalMessagesPublic*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.totalMessagesPrivate, (data.totalMessagesPrivate*100)/(data.totalMessagesPublic+data.totalMessagesPrivate))
-		text += fmt.Sprintf("#### And they sent a total of **%d files** for a total of **%s**.\n", p.currentAnalytic.FilesNb, byteCountDecimal(p.currentAnalytic.FilesSize))
+		text += fmt.Sprintf("#### **%d users** sent **%d messages** in **%d channels**. **%d** *(%d%%)* of the messages were in public channels, **%d** *(%d%%)* in private.\n", len(data.users), data.totalMessagesPublic+data.totalMessagesPrivate, len(data.channels), data.totalMessagesPublic, (data.totalMessagesPublic*100)/(data.totalMessagesPublic+data.totalMessagesPrivate), data.totalMessagesPrivate, (data.totalMessagesPrivate*100)/(data.totalMessagesPublic+data.totalMessagesPrivate))
+		text += fmt.Sprintf("#### Moreover, **%d files** were sent for a total uppload size of **%s**.\n", p.currentAnalytic.FilesNb, byteCountDecimal(p.currentAnalytic.FilesSize))
 	}
 
 	fields := append(getUsersFields(*siteURL, data), getChannelsFields(*siteURL, data)...)
@@ -72,15 +72,15 @@ func (p *Plugin) sendAnalytics(ChannelsID []string) error {
 }
 
 func getUsersFields(siteURL string, data *preparedData) []*model.SlackAttachmentField {
-	m := "### Podium Speaker Users\n"
+	m := "### Top Users\n"
 	if len(data.users) > 0 {
-		m = m + fmt.Sprintf("* :1st_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[0].name, data.users[0].nb, getPercentComparingToPublicMessages(data, data.users[0]), data.users[0].reply)
+		m = m + fmt.Sprintf("* :1st_place_medal: @%s: **%d** messages *(%d%% of total)* with %d replies.\n", data.users[0].name, data.users[0].nb, getPercentComparingToPublicMessages(data, data.users[0]), data.users[0].reply)
 	}
 	if len(data.users) > 1 {
-		m = m + fmt.Sprintf("* :2nd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[1].name, data.users[1].nb, getPercentComparingToPublicMessages(data, data.users[1]), data.users[1].reply)
+		m = m + fmt.Sprintf("* :2nd_place_medal: @%s: **%d** messages *(%d%% of total)* with %d replies.\n", data.users[1].name, data.users[1].nb, getPercentComparingToPublicMessages(data, data.users[1]), data.users[1].reply)
 	}
 	if len(data.users) > 2 {
-		m = m + fmt.Sprintf("* :3rd_place_medal: @%s with a total of **%d** *(%d%%)* public messages with %d reply\n", data.users[2].name, data.users[2].nb, getPercentComparingToPublicMessages(data, data.users[2]), data.users[2].reply)
+		m = m + fmt.Sprintf("* :3rd_place_medal: @%s: **%d** messages *(%d%% of total)* with %d replies.\n", data.users[2].name, data.users[2].nb, getPercentComparingToPublicMessages(data, data.users[2]), data.users[2].reply)
 	}
 	urlChart, _ := url.Parse(siteURL + "/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
 	parametersURL := url.Values{}
@@ -95,15 +95,15 @@ func getUsersFields(siteURL string, data *preparedData) []*model.SlackAttachment
 }
 
 func getChannelsFields(siteURL string, data *preparedData) []*model.SlackAttachmentField {
-	m := "### Podium Channels Conversations\n"
+	m := "### Top Channels\n"
 	if len(data.channels) > 0 {
-		m = m + fmt.Sprintf("* :1st_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[0]), data.channels[0].nb, getPercentComparingToAllMessages(data, data.channels[0]), data.channels[0].reply)
+		m = m + fmt.Sprintf("* :1st_place_medal: %s: **%d** messages *(%d%% of total)* with %d replies.\n", getChannelLink(data.channels[0]), data.channels[0].nb, getPercentComparingToAllMessages(data, data.channels[0]), data.channels[0].reply)
 	}
 	if len(data.channels) > 1 {
-		m = m + fmt.Sprintf("* :2nd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[1]), data.channels[1].nb, getPercentComparingToAllMessages(data, data.channels[1]), data.channels[1].reply)
+		m = m + fmt.Sprintf("* :2nd_place_medal: %s: **%d** messages *(%d%% of total)* with %d replies.\n", getChannelLink(data.channels[1]), data.channels[1].nb, getPercentComparingToAllMessages(data, data.channels[1]), data.channels[1].reply)
 	}
 	if len(data.channels) > 2 {
-		m = m + fmt.Sprintf("* :3rd_place_medal: %s with a total of **%d** *(%d%%)* messages with %d reply\n", getChannelLink(data.channels[2]), data.channels[2].nb, getPercentComparingToAllMessages(data, data.channels[2]), data.channels[2].reply)
+		m = m + fmt.Sprintf("* :3rd_place_medal: %s: **%d** messages *(%d%% of total)* with %d replies.\n", getChannelLink(data.channels[2]), data.channels[2].nb, getPercentComparingToAllMessages(data, data.channels[2]), data.channels[2].reply)
 	}
 	urlChart, _ := url.Parse(siteURL + "/plugins/com.github.manland.mattermost-plugin-analytics/pie.svg")
 	parametersURL := url.Values{}
